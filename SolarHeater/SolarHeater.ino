@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ********************************************************/
 
-#include <config.h>
+#include "config.h"
 
 #include <PID_v1.h>
 #include <ESP8266WiFi.h>
@@ -26,10 +26,9 @@
 #include <ArduinoOTA.h>
 #include <SimpleTimer.h>
 #include <PubSubClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
-#define TEMP_INT 0
-#define TEMP_EXT 1
-#define TEMP_TOP 2
 #define RELAY_PIN 6
 
 //Define Variables we'll be connecting to
@@ -48,10 +47,17 @@ unsigned long windowStartTime;
 
 char buf[10];
 String value;
-char mptt_location[16];
+char mqtt_location[16];
+int mqtt_publish_time = 25000; // How often to publish temps to MQTT
+unsigned long mqtt_last_publish;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+OneWire oneWire(5);
+DallasTemperature sensors(&oneWire);
+
+int deviceCount = 0;
 
 void setup()
 {
@@ -103,6 +109,15 @@ void setup()
 
   //turn the PID on
   myPID.SetMode(AUTOMATIC);
+
+  sensors.begin();
+  Serial.print("Locating devices...");
+  Serial.print("Found ");
+  deviceCount = sensors.getDeviceCount();
+  Serial.print(deviceCount, DEC);
+  Serial.println(" devices.");
+  Serial.println("");
+  
 }
 
 void reconnect() {
@@ -127,19 +142,12 @@ void loop()
     reconnect();
   }
   
-  // Read in temperatures
-  digitalWrite(TEMP_INT, HIGH);
-  delay(100);
-  temp_int = ((analogRead(A0)*(1000/1023))-500)/10
-  digitalWrite(TEMP_INT, LOW);
-  digitalWrite(TEMP_EXT, HIGH);
-  delay(100);
-  temp_ext = ((analogRead(A0)*(1000/1023))-500)/10
-  digitalWrite(TEMP_EXT, LOW);
-  digitalWrite(TEMP_TOP, HIGH);
-  delay(100);
-  temp_top = ((analogRead(A0)*(1000/1023))-500)/10
-  digitalWrite(TEMP_TOP, LOW);
+  sensors.requestTemperatures(); 
+
+
+  temp_int = sensors.getTempCByIndex(0);
+  temp_ext = sensors.getTempCByIndex(1);
+  temp_top = sensors.getTempCByIndex(2);
   Input = temp_int;
   myPID.Compute();
 
@@ -160,13 +168,16 @@ void loop()
   }
 
   // Send values to MQTT server for home automation
-  client.publish("SolarHeater/1/temp_int", temp_int);
-  client.publish("SolarHeater/1/temp_ext", temp_ext);
-  client.publish("SolarHeater/1/temp_top", temp_top);
-  client.publish("SolarHeater/1/relay_state", relay_state);
+  if (millis() > mqtt_last_publish + mqtt_publish_time ) {
+    char ctemp_int[8];
+    char ctemp_ext[8];
+    char ctemp_top[8];
+    client.publish("SolarHeater/1/temp_int", dtostrf(temp_int, 6, 2, ctemp_int));
+    client.publish("SolarHeater/1/temp_ext", dtostrf(temp_ext, 6, 2, ctemp_ext));
+    client.publish("SolarHeater/1/temp_top", dtostrf(temp_top, 6, 2, ctemp_top));
+    //client.publish("SolarHeater/1/relay_state", relay_state);
 
-  client.loop();
+    client.loop();
+    mqtt_last_publish = millis();
+  }
 }
-
-
-

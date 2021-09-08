@@ -2,6 +2,6 @@ const char* ssid = "YOUR SID";
 const char* password = "YOUR PASSWORD";
 const char* mqtt_server = "MQTT SERVER";
 
-#define MPTT_ROOT                       "SolarHeater"
+#define MQTT_ROOT                       "SolarHeater"
 #define SOLARHEATER_DEVICE_ID           1
 

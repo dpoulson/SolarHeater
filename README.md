@@ -7,7 +7,7 @@ It will also log data to an MQTT server on the network.
 # Electronics:
 
 * NodeMCU
-* TMP36 temperature sensor (x3)
+* Dallas one wire temperature sensor (x3)
 * Relay
 * Solar panel
 * Solar charge controller
